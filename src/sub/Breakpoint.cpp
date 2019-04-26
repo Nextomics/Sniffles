@@ -279,8 +279,13 @@ char Breakpoint::get_SVtype() {
 	return this->sv_type;
 }
 
+/*GrandOmics comment
+	SV type confirmation based on the majority one
+*/
 void Breakpoint::calc_support() {
 
+	//GrandOmics comment
+	//SV types array, [DEL, DUP, INS, INV, TRA, NEST]
 	ushort sv[6] = { 0, 0, 0, 0, 0, 0 };
 
 //run over all supports and check the majority type:

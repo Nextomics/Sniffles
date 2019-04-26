@@ -127,6 +127,13 @@ vector<differences_str> Alignment::summarize_csstring(std::vector<indel_str> &de
 	return events;
 }
 
+/*GrandOmics comment
+	summarize events based on alignemnt file, return groups of
+	(aligned reference position, read position and type), types
+	include substitution(0), deletion(del length), insertion(-ins length)
+
+	parse Cigar data with type M/I/D/=/X to get alignment length and event
+*/
 vector<differences_str> Alignment::summarizeAlignment(std::vector<indel_str> &dels) {
 //	clock_t comp_aln = clock();
 	vector<differences_str> events;
@@ -699,6 +706,10 @@ bool Alignment::overlapping_segments(vector<aln_str> entries) {
 	}
 	return (entries.size() == 2 && abs(entries[0].pos - entries[1].pos) < 100);
 }
+
+/*GrandOmics comment
+	summarize split sv events
+*/
 vector<aln_str> Alignment::getSA(RefVector ref) {
 
 	string sa;
@@ -1086,6 +1097,8 @@ vector<int> Alignment::get_avg_diff(double & dist, double & avg_del, double & av
 	avg_ins = 0;
 	vector<int> mis_per_window;
 	std::vector<indel_str> dels;
+	//GrandOmics comment: summarize alignment events
+	//return groups of (aligned reference position, read position, type)
 	vector<differences_str> event_aln = summarizeAlignment(dels);
 	if (event_aln.empty()) {
 		dist = 0;
@@ -1107,6 +1120,9 @@ vector<int> Alignment::get_avg_diff(double & dist, double & avg_del, double & av
 
 			pair_str tmp;
 			tmp.position = -1;
+			//GrandOmics comment: refer to PlaneSweep_slim.cpp
+			//type == 0: substitution event
+			//type != 0: indel event, positive for deletion, negative for insertion
 			if (event_aln[i].type == 0) {
 				tmp = plane->add_mut(event_aln[i].position, 1, min_tresh);
 			} else {
@@ -1132,6 +1148,9 @@ vector<int> Alignment::get_avg_diff(double & dist, double & avg_del, double & av
 	return mis_per_window;	//total_num /num;
 }
 
+/*GrandOmics comment
+	Summarize sv events
+*/
 vector<str_event> Alignment::get_events_Aln() {
 
 	bool flag = (strcmp(this->getName().c_str(), Parameter::Instance()->read_name.c_str()) == 0);
@@ -1168,6 +1187,9 @@ vector<str_event> Alignment::get_events_Aln() {
 		} else {
 			tmp = plane->add_mut(event_aln[i].position, 1, Parameter::Instance()->window_thresh);	// abs(event_aln[i].type)
 		}
+		//GrandOmics comment
+		//if indel length is larger than minimum sv length(default 30) or
+		//potential noisy region, add sv event for further analysis
 		if (tmp.position != -1 && (profile.empty() || (tmp.position - profile[profile.size() - 1].position) > 100)) {	//for noisy events;
 			profile.push_back(tmp);
 		} else if (abs(event_aln[i].type) > Parameter::Instance()->min_length) {	//for single events like NGM-LR would produce them.
@@ -1179,6 +1201,8 @@ vector<str_event> Alignment::get_events_Aln() {
 //comp_aln = clock();
 	int stop = 0;
 	size_t start = 0;
+	//GrandOmics comment
+	//For each potential sv event, enlarge the region coordinate forward and backward 
 	for (size_t i = 0; i < profile.size() && stop < event_aln.size(); i++) {
 		if (profile[i].position >= event_aln[stop].position) {
 			//find the postion:
@@ -1276,6 +1300,10 @@ vector<str_event> Alignment::get_events_Aln() {
 			tmp.length = (tmp.length - event_aln[start].position);
 
 			tmp.type = 0;
+			//GrandOmics comment
+			//Insertion type rules:
+			//	- insertion length is larger than default minimum sv length(default 30)
+			//	- insertion length is two times larger than deletion length
 			if (insert_max > Parameter::Instance()->min_length && insert > (del + del)) { //we have an insertion! //todo check || vs. &&
 				if (is_N_region && insert_max * Parameter::Instance()->avg_ins < Parameter::Instance()->min_length) {
 					tmp.type = 0;
@@ -1304,6 +1332,10 @@ vector<str_event> Alignment::get_events_Aln() {
 					tmp.type |= INS;
 					tmp.is_noise = false;
 				}
+			//GrandOmics comment
+			//Deletion type rules:
+			//	- deletion length is larger than default minimum sv length(default 30)
+			//	- deletion length is two times larger than insertion length
 			} else if (del_max > Parameter::Instance()->min_length && (insert + insert) < del) { //deletion
 				if (is_N_region && del_max * Parameter::Instance()->avg_del < Parameter::Instance()->min_length) {
 					tmp.type = 0;

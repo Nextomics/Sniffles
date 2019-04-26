@@ -117,6 +117,11 @@ std::string Cluster_SVS::find_id(int curr_id, std::vector<combine_str> & ids) {
 	ss << curr_id;
 	return ss.str();
 }
+
+/*GrandOmics comment
+	1. use hash table to cluster read and relative variant ids
+	2. cluster variant based on the smallest ID
+*/
 void Cluster_SVS::update_SVs() {
 //1: read in names + IDs -> store in map!
 	int max_ID = 0;

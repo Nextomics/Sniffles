@@ -194,6 +194,16 @@ void write_read(Alignment * tmp_aln, FILE * & ref_allel_reads) {
 	}
 	fprintf(ref_allel_reads, "%c",'\n');
 }
+
+/*GrandOmics comment
+	detect sv breakpoint and insert into interval tree
+	1. estimate parameters using randomly chosen 1000 aligned reads
+	2. parse bam file, process 10000 reads as batch and switch 
+	   chromosome during processing
+	   - analyze aln event and split event
+	   - add aln and split event into iterval tree
+	3. get breakpoints and calculate sv support
+*/
 void detect_breakpoints(std::string read_filename, IPrinter *& printer) {
 	estimate_parameters(read_filename);
 	BamParser * mapped_file = 0;
@@ -282,6 +292,8 @@ void detect_breakpoints(std::string read_filename, IPrinter *& printer) {
 #pragma omp sections
 					{
 #pragma omp section
+						//GrandOmics comment: refer to Alignment.cpp
+						//summarize sv events, see struct str_event for detail
 						{
 							//		clock_t begin = clock();
 							if ((score == -1 || score > Parameter::Instance()->score_treshold)) {
@@ -318,6 +330,7 @@ void detect_breakpoints(std::string read_filename, IPrinter *& printer) {
 					//fwrite(&tmp, sizeof(struct str_read), 1, ref_allel_reads);
 				}
 
+				//GrandOmics comment
 				//store the potential SVs:
 				if (!aln_event.empty()) {
 					add_events(tmp_aln, aln_event, 0, ref_space, bst, root, num_reads, false);
@@ -349,7 +362,10 @@ void detect_breakpoints(std::string read_filename, IPrinter *& printer) {
 	 del += "ref_allele";
 	 system(del.c_str());
 	 }*/
-
+	
+	//GrandOmics comment
+	//check breakpoints support and add valid point into final iterval tree
+	//refer to Breakpoint.cpp
 	for (int i = 0; i < points.size(); i++) {
 		points[i]->calc_support();
 		if (points[i]->get_valid()) {
@@ -369,6 +385,8 @@ void detect_breakpoints(std::string read_filename, IPrinter *& printer) {
 	for (size_t i = 0; i < points_size; i++) { // its not nice, but I may alter the length of the vector within the loop.
 		if (points[i]->get_SVtype() & TRA) {
 			vector<Breakpoint *> new_points;
+			//GrandOmics comment
+			//Detect falsely merged svs for TRA event
 			detect_merged_svs(points[i]->get_coordinates(), ref, new_points);
 			if (!new_points.empty()) {							// I only allow for 1 split!!
 				points[i] = new_points[0];
@@ -392,6 +410,9 @@ void detect_breakpoints(std::string read_filename, IPrinter *& printer) {
 	}
 }
 
+/*GrandOmics comment
+	add breakpoints into interval tree
+*/
 void add_events(Alignment *& tmp, std::vector<str_event> events, short type, long ref_space, IntervallTree & bst, TNode *&root, long read_id, bool add) {
 
 	bool flag = (strcmp(tmp->getName().c_str(), Parameter::Instance()->read_name.c_str()) == 0);
@@ -473,6 +494,9 @@ void add_events(Alignment *& tmp, std::vector<str_event> events, short type, lon
 //	}
 }
 
+/*GrandOmics comment
+	analyze split alignment event, and add points into interval tree
+*/
 void add_splits(Alignment *& tmp, std::vector<aln_str> events, short type, RefVector ref, IntervallTree& bst, TNode *&root, long read_id, bool add) {
 	bool flag = (strcmp(tmp->getName().c_str(), Parameter::Instance()->read_name.c_str()) == 0);
 
@@ -501,6 +525,9 @@ void add_splits(Alignment *& tmp, std::vector<aln_str> events, short type, RefVe
 		read.read_strand.second = events[i].strand;
 
 		//stop.support.push_back(read);
+
+		//GrandOmics comment
+		//split alignment events lay on same reference read => insertion/deletion/duplication/inversion
 		if (events[i].RefID == events[i - 1].RefID) { //IF different chr -> tra
 			if (events[i - 1].strand == events[i].strand) { //IF same strand -> del/ins/dup
 				if (events[i - 1].strand) {
@@ -525,7 +552,8 @@ void add_splits(Alignment *& tmp, std::vector<aln_str> events, short type, RefVe
 				if (flag) {
 					cout << "Debug: SV_Size: " << (svs.start.min_pos - svs.stop.max_pos) << " tmp: " << (svs.stop.max_pos - svs.start.min_pos) << " Ref_start: " << svs.start.min_pos - get_ref_lengths(events[i].RefID, ref) << " Ref_stop: " << svs.stop.max_pos - get_ref_lengths(events[i].RefID, ref) << " readstart: " << svs.read_start << " readstop: " << svs.read_stop << std::endl;
 				}
-
+				//GrandOmics comment
+				//Insertion type rules
 				if ((svs.stop.max_pos - svs.start.min_pos) > Parameter::Instance()->min_length * -1 && ((svs.stop.max_pos - svs.start.min_pos) + (Parameter::Instance()->min_length) < (svs.read_stop - svs.read_start) && (svs.read_stop - svs.read_start) > (Parameter::Instance()->min_length * 2))) {
 					if (!events[i].cross_N || (double) ((svs.stop.max_pos - svs.start.min_pos) + Parameter::Instance()->min_length) < ((double) (svs.read_stop - svs.read_start) * Parameter::Instance()->avg_ins)) {
 						svs.stop.max_pos += (svs.read_stop - svs.read_start); //TODO check!
@@ -552,7 +580,8 @@ void add_splits(Alignment *& tmp, std::vector<aln_str> events, short type, RefVe
 					} else {
 						read.SV |= 'n';
 					}
-
+				//GrandOmics comment
+				//Deletion type rules
 				} else if ((svs.start.min_pos - svs.stop.max_pos) * -1 > (svs.read_stop - svs.read_start) + (Parameter::Instance()->min_length)) {
 					if (!events[i].cross_N || (double) (svs.start.min_pos - svs.stop.max_pos) * Parameter::Instance()->avg_del * -1.0 > (double) ((svs.read_stop - svs.read_start) + (Parameter::Instance()->min_length))) {
 						read.SV |= DEL;
@@ -562,7 +591,8 @@ void add_splits(Alignment *& tmp, std::vector<aln_str> events, short type, RefVe
 					} else {
 						read.SV |= 'n';
 					}
-
+				//GrandOmics comment
+				//Duplication type rules
 				} else if ((svs.start.min_pos - svs.stop.max_pos) > Parameter::Instance()->min_length && (svs.read_start - svs.read_stop) < Parameter::Instance()->min_length) { //check with respect to the coords of reads!
 					if (flag) {
 						cout << "DUP: " << endl;
@@ -610,7 +640,8 @@ void add_splits(Alignment *& tmp, std::vector<aln_str> events, short type, RefVe
 					}
 				}
 			}
-
+		//GrandOmics comment
+		//split alignment events lay on different reference read => translocation
 		} else { //if not on the same chr-> TRA
 			read.strand.first = events[i - 1].strand;
 			read.strand.second = !events[i].strand;
@@ -695,11 +726,15 @@ void add_splits(Alignment *& tmp, std::vector<aln_str> events, short type, RefVe
 	//}
 }
 
+/*GrandOmics comment
+	randomly choose 1000 reads and estimate distribution of different pattern parameters
+*/
 void estimate_parameters(std::string read_filename) {
 	if (Parameter::Instance()->skip_parameter_estimation) {
 		return;
 	}
 	cout << "Estimating parameter..." << endl;
+	//GrandOmics comment: we can use htslib library to parse bam file
 	BamParser * mapped_file = 0;
 	RefVector ref;
 	if (read_filename.find("bam") != string::npos) {
@@ -730,7 +765,7 @@ void estimate_parameters(std::string read_filename) {
 			double dist = 0;
 			double avg_del = 0;
 			double avg_ins = 0;
-			vector<int> tmp = tmp_aln->get_avg_diff(dist, avg_del, avg_ins);
+			vector<int> tmp = tmp_aln->get_avg_diff(dist, avg_del, avg_ins); //GrandOmics comment: refer to Alignment.cpp
 			//	std::cout<<"Debug:\t"<<avg_del<<" "<<avg_ins<<endl;
 			tot_avg_ins += avg_ins;
 			tot_avg_del += avg_del;

@@ -7,6 +7,11 @@
 
 #include "PlaneSweep_slim.h"
 
+/*GrandOmics comment
+	PlaneSweep alogrithm for evaluating alignment event.
+	Here region start equals to event start position, 
+	region end equals to start + boundry(default 100).
+*/
 pair_str PlaneSweep_slim::add_mut(int pos,int new_cov, int min_cov) {
 	//check if we need to release reads:
 	std::vector<pair_str>::iterator j = entries.begin();

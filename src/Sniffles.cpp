@@ -68,7 +68,7 @@ void printParameter(std::stringstream & usage, TCLAP::SwitchArg & arg) {
 		- maximum segment number
 		- minimum segment length
 		- maximum distance to group SV
-		- maximum distance between alignment: e.g. 100M10D20M3I10M => [10, 3]
+		- maximum distance between alignment
 		- maximum differece per 100bp window
 */
 void read_parameters(int argc, char *argv[]) {
