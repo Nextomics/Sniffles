@@ -60,6 +60,17 @@ void printParameter(std::stringstream & usage, TCLAP::SwitchArg & arg) {
 	usage << std::endl;
 }
 
+/*GrandOmics comment
+	initialize parameters
+
+	especially mention:
+		- minimum length for SV detection
+		- maximum segment number
+		- minimum segment length
+		- maximum distance to group SV
+		- maximum distance between alignment: e.g. 100M10D20M3I10M => [10, 3]
+		- maximum differece per 100bp window
+*/
 void read_parameters(int argc, char *argv[]) {
 
 //	TCLAP::CmdLine cmd("", ' ', "", true);
@@ -430,6 +441,15 @@ void test_slimming() {
 	}
 }
 
+/*GrandOmics comment
+	main function:
+	1. initialize parameters using read_parameters
+	2. if input is bam file, call strutural variation using detect_breakpoints
+	3. if input is vcf file, build variation iterval tree and call sv using force_calling
+	4. cluter sv using Cluster_SVS::update_SVs
+	5. if setting genotype mode, predict genotype using Genotyper::update_SVs
+*/
+
 int main(int argc, char *argv[]) {
 
 	try {
@@ -458,6 +478,7 @@ int main(int argc, char *argv[]) {
 		printer->init();
 		if (Parameter::Instance()->input_vcf.empty()) {
 			//regular calling
+			//GrandOmics comment: ref to Detect_Breakpoints.cpp
 			detect_breakpoints(Parameter::Instance()->bam_files[0], printer); //we could write out all read names for each sVs
 		} else {
 			//force calling was selected:
@@ -470,6 +491,7 @@ int main(int argc, char *argv[]) {
 		if (Parameter::Instance()->phase) {
 			std::cout << "Start phasing: " << std::endl;
 			Cluster_SVS *cluster = new Cluster_SVS();
+			//GrandOmics comment: refer to Cluster_SVs.cpp
 			cluster->update_SVs();
 		}
 
@@ -477,6 +499,7 @@ int main(int argc, char *argv[]) {
 		if (Parameter::Instance()->genotype) {
 			std::cout << "Start genotype calling:" << std::endl;
 			Genotyper * go = new Genotyper();
+			//GrandOmics comment: refer to Genotyper.cpp
 			go->update_SVs();
 		}
 
